@@ -1,0 +1,97 @@
+<?php
+
+
+/*
+ * Gathers information about the current content type groups.
+ */
+function contenttypegroup_gather($key = NULL, $reset = FALSE) {
+  static $groups = NULL;
+  if (!isset($groups) || $reset) {
+    $groups = module_invoke_all('contenttypegroup');
+  }
+  if ($key) return $groups[$key];
+  else return $groups;
+}
+
+
+/*
+ * 
+function hook_contenttypegroup() {
+  return array(
+   'group_key' => array(
+    'types'=>array(
+      'story'
+      ),
+     ... misc settings ..
+   ),
+  );
+}
+*/
+/*
+ * Implementation of hook_form_alter
+ * Disable certian items if configured to be disabled for the group.
+ */
+function contenttypegroup_form_alter(&$form, $form_state, $form_id) {  
+  if (isset($form['#node']) && $form['#node']->type .'_node_form' == $form_id) {
+    foreach(contenttypegroup_gather() as $group => $info) {
+      if (!in_array($form['#node']->type, $info['types']) || empty($info['node_form_disable'])) continue;
+      foreach($info['node_form_disable'] as $disable){
+        if(is_array($disable)) {
+          contenttypegroupdisable($form,$disable);
+        }
+        else {
+          if ($form[$disable]) $form[$disable]['#access'] = false;
+        }
+      }
+    }
+  }
+}
+
+function contenttypegroupdisable(&$form,$disable) {
+  if($disable){
+    $k = array_shift($disable);
+    contenttypegroupdisable($form[$k],$disable);
+  }
+  else $form['#access'] = false;
+}
+
+
+function contenttypegroup_cron() {
+  $result = db_query('SELECT r.rid, p.perm FROM {role} r LEFT JOIN {permission} p ON r.rid = p.rid ORDER BY name');
+  // Compile role array:
+  // Add a comma at the end so when searching for a permission, we can
+  // always search for "$perm," to make sure we do not confuse
+  // permissions that are substrings of each other.
+  while ($role = db_fetch_object($result)) {
+    $role_permissions[$role->rid] = array();//explode(', ',$role->perm);
+  }
+  $permissions = module_invoke_all('perm');
+  foreach(contenttypegroup_gather() as $group => $info) {
+    if (empty($info['auto_permissions'])) continue;
+    foreach($info['auto_permissions'] as $perm => $rids) {
+      foreach($rids as $rid) {
+        if (!isset($role_permissions[$rid])) continue;
+        if (strstr($perm,'[type]') ) {
+          foreach($info['types'] as $type) {
+            $nperm = str_replace('[type]',$type,$perm);
+            if (in_array($nperm,$permissions) && !in_array($nperm, $role_permissions[$rid])) {
+              $role_permissions[$rid][] = $nperm;
+            } 
+          }
+        } else {
+          if (in_array($perm,$permissions) && !in_array($perm, $role_permissions[$rid])) {
+            $role_permissions[$rid][] = $nperm;
+          } 
+        }
+      }
+    }
+  }
+  foreach($role_permissions as $rid => $perms) {
+    // Delete, so if we clear every checkbox we reset that role;
+    // otherwise permissions are active and denied everywhere.
+    db_query('DELETE FROM {permission} WHERE rid = %d', $rid);
+    if (count($role_permissions)) {
+      db_query("INSERT INTO {permission} (rid, perm) VALUES (%d, '%s')", $rid, implode(', ',$role_permissions[$rid]));
+    }
+  }
+}

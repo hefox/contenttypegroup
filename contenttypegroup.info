@@ -1,0 +1,4 @@
+core = "6.x"
+name = "Content Type group"
+description = Provides an api for grouping content types and some base uses
+package = "Content"
