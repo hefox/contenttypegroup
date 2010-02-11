@@ -95,3 +95,13 @@ function contenttypegroup_cron() {
     }
   }
 }
+
+
+function contenttypegroup_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  foreach(contenttypegroup_gather() as $group => $info) {
+    if (!in_array($node->type, $info['types']) || isset($info['disable_preprocess'])) continue;
+    // node type should come second, ie higher prop, so array shift instead
+    array_unshift($variables['template_files'],'node-'.str_replace('_','-',$group));
+  }
+}
