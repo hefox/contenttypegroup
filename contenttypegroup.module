@@ -56,7 +56,7 @@ function contenttypegroupdisable(&$form,$disable) {
 }
 
 
-function contenttypegroup_cron() {
+/*function contenttypegroup_cron() {
   $result = db_query('SELECT r.rid, p.perm FROM {role} r LEFT JOIN {permission} p ON r.rid = p.rid ORDER BY name');
   // Compile role array:
   // Add a comma at the end so when searching for a permission, we can
@@ -95,7 +95,7 @@ function contenttypegroup_cron() {
     }
   }
 }
-
+*/
 
 function contenttypegroup_preprocess_node(&$variables) {
   $node = $variables['node'];
